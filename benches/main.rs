@@ -88,23 +88,34 @@ fn dispatch(b: &mut Bencher) {
     b.iter(|| {
         let mut current = stream[0];
         let mut skip = 0;
-        for &next in &stream[1..] {
+
+        let mut i = 0;
+        while i < stream.len() {
+            let mut next = 0;
             if current == 0 {
-                if next == 0 {
+                while i < stream.len() {
+                    next = stream[i];
+                    if next != 0 {
+                        break;
+                    }
                     skip += 1;
-                } else {
-                    current = next;
-                    black_box(skip);
-                    skip = 0;
+                    i += 1;
                 }
+                current = next;
+                black_box(skip);
+                skip = 0;
             } else if current == 1 {
-                if next == 1 {
+                while i < stream.len() {
+                    next = stream[i];
+                    if next != 1 {
+                        break;
+                    }
                     skip += 1;
-                } else {
-                    current = next;
-                    black_box(skip);
-                    skip = 0;
+                    i += 1;
                 }
+                current = next;
+                black_box(skip);
+                skip = 0;
             }
         }
         black_box(current);
