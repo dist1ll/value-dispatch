@@ -10,7 +10,7 @@
 use std::hint::black_box;
 
 use rand::{
-    distributions::{Bernoulli, WeightedIndex},
+    distributions::{Bernoulli, Uniform, WeightedIndex},
     prelude::Distribution,
     thread_rng,
 };
@@ -34,24 +34,32 @@ fn create_stream(size: usize) -> Vec<u8> {
     // weighted index according to distribution
     // let weights_t0 = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
     // let weights_t1 = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10];
-    let weights_t0 = [80, 15, 5, 0, 0, 0, 0, 0, 0, 0];
-    let weights_t1 = [0, 0, 0, 30, 25, 15, 10, 5, 15, 0];
+    // let weights_t0 = [80, 15, 5, 0, 0, 0, 0, 0, 0, 0];
+    // let weights_t1 = [0, 0, 0, 30, 25, 15, 10, 5, 15, 0];
+    let weights_t0 = [100, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let weights_t1 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 100];
 
     let dist0 = WeightedIndex::new(&weights_t0).unwrap();
     let dist1 = WeightedIndex::new(&weights_t1).unwrap();
 
-    let mut i = 0;
+    let range_0 = 10;
+    let dist0_value = Uniform::new_inclusive(10u8, 10u8 + range_0);
+
+    let coinflip_classes = Bernoulli::new(1f64 / range_0 as f64).unwrap();
     loop {
-        if i % 2 == 0 {
+        // take this branch with 90% probability
+        if !coinflip_classes.sample(&mut rng) {
             for _ in 0..choices[dist0.sample(&mut rng)] {
-                result.push(0);
+                // push a number from group 0
+                result.push(dist0_value.sample(&mut rng));
             }
-        } else {
+        } 
+        // take this branch with 10% probability
+        else {
             for _ in 0..choices[dist1.sample(&mut rng)] {
                 result.push(1);
             }
         }
-        i += 1;
 
         if result.len() >= size {
             // remove trailing elements
@@ -65,7 +73,7 @@ fn create_stream(size: usize) -> Vec<u8> {
     result
 }
 #[bench]
-fn no_dispatch(b: &mut Bencher) {
+fn no_dispatch_impl(b: &mut Bencher) {
     let stream = create_stream(1 << 18);
     b.iter(|| {
         let mut current = stream[0];
@@ -83,7 +91,7 @@ fn no_dispatch(b: &mut Bencher) {
     });
 }
 #[bench]
-fn dispatch(b: &mut Bencher) {
+fn dispatch_impl(b: &mut Bencher) {
     let stream = create_stream(1 << 18);
     b.iter(|| {
         let mut current = stream[0];
@@ -92,10 +100,10 @@ fn dispatch(b: &mut Bencher) {
         let mut i = 0;
         while i < stream.len() {
             let mut next = 0;
-            if current == 0 {
+            if current == 1 {
                 while i < stream.len() {
                     next = stream[i];
-                    if next != 0 {
+                    if next != 1 {
                         break;
                     }
                     skip += 1;
@@ -104,10 +112,10 @@ fn dispatch(b: &mut Bencher) {
                 current = next;
                 black_box(skip);
                 skip = 0;
-            } else if current == 1 {
+            } else {
                 while i < stream.len() {
                     next = stream[i];
-                    if next != 1 {
+                    if current != next {
                         break;
                     }
                     skip += 1;
